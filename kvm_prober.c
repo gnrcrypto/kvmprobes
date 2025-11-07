@@ -40,6 +40,13 @@
 #define IOCTL_READ_HOST_PHYS     0x1018
 #define IOCTL_WRITE_HOST_PHYS    0x1019
 
+/* New guest-side IOCTLs added to kernel module */
+#define IOCTL_PROBE_FLAGS_READ   0x1020
+#define IOCTL_PROBE_FLAGS_WRITE  0x1021
+#define IOCTL_TRIGGER_APIC_WRITE 0x1022
+#define IOCTL_TRIGGER_MMIO_WRITE 0x1023
+#define IOCTL_TRIGGER_IOPORT_WRITE 0x1024
+
 struct port_io_data {
     unsigned short port;
     unsigned int size;
@@ -113,6 +120,28 @@ struct host_phys_access {
     unsigned long length;
     unsigned char *user_buffer;
 };
+
+/* APIC write request for IOCTL_TRIGGER_APIC_WRITE */
+struct apic_write_req {
+    unsigned long base;   /* 0 to use default 0xfee00000 */
+    unsigned int offset;  /* offset from APIC base (e.g. 0xb0 for EOI) */
+    unsigned int size;    /* 1,2,4,8 */
+    unsigned long value;
+};
+
+/* Print a u64 value as a full 64-hex-digit string (zero-padded on the left).
+ * Kernel currently returns a 64-bit value for the probe read IOCTL; this helper
+ * ensures userland prints it as a full 64-hex-digit flag (left-padded with zeros).
+ */
+static void print_full_64hex_from_u64(unsigned long v)
+{
+    char s[65];
+    memset(s, '0', 64);
+    s[64] = '\0';
+    /* write the lower 16 hex digits (64-bit value) into the right-most part */
+    snprintf(s + 48, 17, "%016llx", (unsigned long long)v);
+    printf("0x%s", s);
+}
 
 // Gold pattern constants
 #define GOLD_FLAG_STRINGS_COUNT 7
@@ -576,6 +605,84 @@ int main(int argc, char *argv[]) {
             printf("Wrote %lu bytes to host physical memory 0x%lx.\n", req.length, req.host_phys_addr);
         free(req.user_buffer);
 
+        /* --- NEW CLI handlers for IOCTLs 0x1020..0x1024 --- */
+    } else if (strcmp(cmd, "probe_flags_read") == 0) {
+        if (argc != 2) { print_usage(argv[0]); close(fd); return 1; }
+        unsigned long val = 0;
+        if (ioctl(fd, IOCTL_PROBE_FLAGS_READ, &val) < 0) {
+            perror("ioctl PROBE_FLAGS_READ failed");
+        } else {
+            printf("Probe flags read: ");
+            print_full_64hex_from_u64(val);
+            printf("\n");
+        }
+
+    } else if (strcmp(cmd, "probe_flags_write") == 0) {
+        if (argc != 3) { print_usage(argv[0]); close(fd); return 1; }
+        unsigned long val = strtoul(argv[2], NULL, 16);
+        if (ioctl(fd, IOCTL_PROBE_FLAGS_WRITE, &val) < 0) {
+            perror("ioctl PROBE_FLAGS_WRITE failed");
+        } else {
+            printf("Wrote ");
+            print_full_64hex_from_u64(val);
+            printf(" to first host flag symbol (probe)\n");
+        }
+
+    } else if (strcmp(cmd, "trigger_apic_write") == 0) {
+        if (argc < 5) { print_usage(argv[0]); close(fd); return 1; }
+        struct apic_write_req req;
+        req.base = 0;
+        req.offset = (unsigned int)strtoul(argv[2], NULL, 16);
+        req.size = (unsigned int)strtoul(argv[3], NULL, 10);
+        req.value = strtoul(argv[4], NULL, 16);
+        if (argc >= 6) req.base = strtoul(argv[5], NULL, 16);
+        if (req.size != 1 && req.size != 2 && req.size != 4 && req.size != 8) {
+            fprintf(stderr, "Invalid size for APIC write\n"); close(fd); return 1;
+        }
+        if (ioctl(fd, IOCTL_TRIGGER_APIC_WRITE, &req) < 0) {
+            perror("ioctl TRIGGER_APIC_WRITE failed");
+        } else {
+            printf("APIC write issued base=0x%lx off=0x%x size=%u val=0x%lx\n",
+                   req.base, req.offset, req.size, req.value);
+        }
+
+    } else if (strcmp(cmd, "trigger_mmio_write") == 0) {
+        if (argc != 6) { print_usage(argv[0]); close(fd); return 1; }
+        struct mmio_data mreq = {0};
+        mreq.phys_addr = strtoul(argv[2], NULL, 16);
+        mreq.size = strtoul(argv[3], NULL, 10); /* 0 for single-value */
+        mreq.value_size = (unsigned int)strtoul(argv[4], NULL, 10);
+        mreq.single_value = strtoul(argv[5], NULL, 16);
+        if (mreq.value_size != 1 && mreq.value_size != 2 && mreq.value_size != 4 && mreq.value_size != 8) {
+            fprintf(stderr, "Invalid value-size\n"); close(fd); return 1;
+        }
+        if (ioctl(fd, IOCTL_TRIGGER_MMIO_WRITE, &mreq) < 0) {
+            perror("ioctl TRIGGER_MMIO_WRITE failed");
+        } else {
+            printf("MMIO write issued phys=0x%lx map_size=%lu value_size=%u val=0x%lx\n",
+                   mreq.phys_addr, mreq.size, mreq.value_size, mreq.single_value);
+        }
+
+    } else if (strcmp(cmd, "trigger_ioport_write") == 0) {
+        if (argc != 5) { print_usage(argv[0]); close(fd); return 1; }
+        struct port_io_data p = {0};
+        p.port = (unsigned short)strtoul(argv[2], NULL, 16);
+        p.size = (unsigned int)strtoul(argv[3], NULL, 10);
+        p.value = (unsigned int)strtoul(argv[4], NULL, 16);
+        if (p.size != 1 && p.size != 2 && p.size != 4) {
+            fprintf(stderr, "Invalid port write size\n"); close(fd); return 1;
+        }
+        if (ioctl(fd, IOCTL_TRIGGER_IOPORT_WRITE, &p) < 0) {
+            perror("ioctl TRIGGER_IOPORT_WRITE failed");
+        } else {
+            printf("IO port write issued port=0x%X size=%u val=0x%X\n", p.port, p.size, p.value);
+        }
+
+    } else {
+        fprintf(stderr, "Unknown command: %s\n", cmd);
+        print_usage(argv[0]);
+    }
+ 
     } else if (strcmp(cmd, "allocvqpage") == 0) {
         if (argc != 2) { print_usage(argv[0]); close(fd); return 1; }
         unsigned long pfn_returned = 0;
