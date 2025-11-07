@@ -678,7 +678,9 @@ int main(int argc, char *argv[]) {
         p.size = (unsigned int)strtoul(argv[3], NULL, 10);
         p.value = (unsigned int)strtoul(argv[4], NULL, 16);
         if (p.size != 1 && p.size != 2 && p.size != 4) {
-            fprintf(stderr, "Invalid port write size\n"); close(fd); return 1;
+            fprintf(stderr, "Invalid port write size\n");
+            close(fd);
+            return 1;
         }
         if (ioctl(fd, IOCTL_TRIGGER_IOPORT_WRITE, &p) < 0) {
             perror("ioctl TRIGGER_IOPORT_WRITE failed");
@@ -686,11 +688,6 @@ int main(int argc, char *argv[]) {
             printf("IO port write issued port=0x%X size=%u val=0x%X\n", p.port, p.size, p.value);
         }
 
-    } else {
-        fprintf(stderr, "Unknown command: %s\n", cmd);
-        print_usage(argv[0]);
-    }
- 
     } else if (strcmp(cmd, "allocvqpage") == 0) {
         if (argc != 2) { print_usage(argv[0]); close(fd); return 1; }
         unsigned long pfn_returned = 0;
