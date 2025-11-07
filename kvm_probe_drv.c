@@ -134,11 +134,8 @@ static unsigned long get_kvm_probe_flag_value(void)
 }
 
 // --- NEW: kernel-side gold patterns and checker (prints only when found) ---
-#define KERNEL_GOLD_ASCII_COUNT 3
+#define KERNEL_GOLD_ASCII_COUNT 0
 static const char *KERNEL_GOLD_ASCII[KERNEL_GOLD_ASCII_COUNT] = {
-    "write_flag",
-    "rce_flag",
-    "read_flag"
 };
 
 #define KERNEL_GOLD_HEX_COUNT 2
