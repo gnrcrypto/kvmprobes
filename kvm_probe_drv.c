@@ -307,7 +307,18 @@ struct host_phys_access {
 #define IOCTL_ATTACH_VQ          0x1013
 #define IOCTL_TRIGGER_VQ         0x1014
 #define IOCTL_SCAN_PHYS          0x1015
-/* New full-flag IOCTL */
+
+/* Missing IOCTLs (must match userland kvm_prober.c) */
+#define IOCTL_READ_HOST_MEM      0x1016
+#define IOCTL_WRITE_HOST_MEM     0x1017
+#define IOCTL_READ_HOST_PHYS     0x1018
+#define IOCTL_WRITE_HOST_PHYS    0x1019
+
+#define IOCTL_PROBE_FLAGS_READ   0x1020
+#define IOCTL_PROBE_FLAGS_WRITE  0x1021
+#define IOCTL_TRIGGER_APIC_WRITE 0x1022
+#define IOCTL_TRIGGER_MMIO_WRITE 0x1023
+#define IOCTL_TRIGGER_IOPORT_WRITE 0x1024
 #define IOCTL_READ_FLAG_FULL     0x1025
 
 static long driver_ioctl(struct file *f, unsigned int cmd, unsigned long arg);
