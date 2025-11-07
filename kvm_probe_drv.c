@@ -296,6 +296,9 @@ static int resolve_function_pointers(void)
     return 0;
 }
 
+/* forward declaration to avoid implicit declaration/conflicting-type errors */
+static long do_hypercall(struct hypercall_args *args);
+
 static long force_hypercall(void) {
     /* Use do_hypercall so special-casing for hypercall 100 is centralized */
     struct hypercall_args args = { .nr = 100, .arg0 = 0, .arg1 = 0, .arg2 = 0, .arg3 = 0 };
