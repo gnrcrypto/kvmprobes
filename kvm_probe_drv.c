@@ -72,7 +72,13 @@ static unsigned long get_kvm_probe_flag_addr(void)
         return g_kvm_probe_flag_addr;
 
     /* Try several candidate symbols exported by host patches */
-    const char *cands[] = { "kvm_probe_flag", "write_flag", "read_flag", "rce_flag", NULL };
+    const char *cands[] = { 
+    "write_flag", "read_flag", "rce_flag", 
+    "write_flag_value", "read_flag_value",
+    "oob_write_flag", "oob_read_flag", "dos_flag",
+    "oob_write_flag_value", "oob_read_flag_value", "dos_flag_value",
+    NULL 
+};
     for (int i = 0; cands[i]; ++i) {
         unsigned long a = kallsyms_lookup_name(cands[i]);
         if (a) {
