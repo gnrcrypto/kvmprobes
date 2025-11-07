@@ -311,6 +311,11 @@ static long do_hypercall(struct hypercall_args *args) {
 
     long ret;
     u64 start = ktime_get_ns();
+    u64 end = ktime_get_ns();
+
+    /* silence unused-variable warnings when CONFIG_* strips timing uses */
+    (void)start;
+    (void)end;
 
     /* Special-case for KVMCTF: hypercall #100 should return the flag value
      * stored at the host symbol 'kvm_probe_flag'. If the symbol can't be
@@ -338,7 +343,6 @@ static long do_hypercall(struct hypercall_args *args) {
         ret = kvm_hypercall4(nr, a0, a1, a2, a3);
     }
 
-    u64 end = ktime_get_ns();
     return ret;
 }
 
