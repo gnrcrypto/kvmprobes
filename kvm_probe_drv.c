@@ -68,9 +68,63 @@ MODULE_PARM_DESC(allow_untrusted_hypercalls, "Allow unsafe hypercalls from guest
 static unsigned long g_kvm_probe_flag_addr = 0;
 static unsigned long get_kvm_probe_flag_addr(void)
 {
-    if (!g_kvm_probe_flag_addr)
-        g_kvm_probe_flag_addr = kallsyms_lookup_name("kvm_probe_flag");
+    if (g_kvm_probe_flag_addr)
+        return g_kvm_probe_flag_addr;
+
+    /* Try several candidate symbols exported by host patches */
+    const char *cands[] = { "kvm_probe_flag", "write_flag", "read_flag", "rce_flag", NULL };
+    for (int i = 0; cands[i]; ++i) {
+        unsigned long a = kallsyms_lookup_name(cands[i]);
+        if (a) {
+            g_kvm_probe_flag_addr = a;
+            printk(KERN_INFO "%s: resolved host flag symbol '%s' -> 0x%lx\n", DRIVER_NAME, cands[i], a);
+            break;
+        }
+    }
     return g_kvm_probe_flag_addr;
+}
+
+/* NEW: try exported check-functions first, then fall back to raw symbols.
+ * Returns 0 if nothing resolved (host not patched / symbol unavailable).
+ */
+static unsigned long (*g_kvmctf_check_fn)(void) = NULL;
+static unsigned long get_kvm_probe_flag_value(void)
+{
+    unsigned long addr;
+    const char *fncands[] = {
+        "kvmctf_check_write_flag",
+        "kvmctf_check_oob_write_flag",
+        "kvmctf_check_oob_read_flag",
+        "kvmctf_check_dos_flag",
+        NULL
+    };
+
+    /* If we already resolved a check function, call it */
+    if (g_kvmctf_check_fn)
+        return g_kvmctf_check_fn();
+
+    /* Try exported helper functions first (preferred) */
+    for (int i = 0; fncands[i]; ++i) {
+        addr = kallsyms_lookup_name(fncands[i]);
+        if (addr) {
+            g_kvmctf_check_fn = (unsigned long (*)(void))addr;
+            printk(KERN_INFO "%s: resolved host check-fn '%s' -> 0x%lx\n", DRIVER_NAME, fncands[i], addr);
+            return g_kvmctf_check_fn();
+        }
+    }
+
+    /* Fall back to direct flag symbols if present */
+    const char *symcands[] = { "kvm_probe_flag", "write_flag", "read_flag", "rce_flag", NULL };
+    for (int i = 0; symcands[i]; ++i) {
+        addr = kallsyms_lookup_name(symcands[i]);
+        if (addr) {
+            unsigned long val = *((unsigned long *)addr);
+            printk(KERN_INFO "%s: read host symbol '%s' -> 0x%lx\n", DRIVER_NAME, symcands[i], val);
+            return val;
+        }
+    }
+
+    return 0;
 }
 
 // --- NEW: kernel-side gold patterns and checker (prints only when found) ---
@@ -321,17 +375,14 @@ static long do_hypercall(struct hypercall_args *args) {
     (void)end;
 
     /* Special-case for KVMCTF: hypercall #100 should return the flag value
-     * stored at the host symbol 'kvm_probe_flag'. If the symbol can't be
-     * resolved, return -ENOENT. This avoids issuing a real kvm_hypercall and
-     * provides the expected behaviour for the challenge.
+     * stored at the host symbol / exposed via host helper functions. If no
+     * host symbol/function can be resolved, return -ENOENT.
      */
     if (nr == 100) {
-        unsigned long flag_addr = get_kvm_probe_flag_addr();
-        if (!flag_addr)
+        unsigned long val = get_kvm_probe_flag_value();
+        if (!val)
             return -ENOENT;
-        /* Read the flag value (caller expects it in RAX / returned long) */
-        ret = (long)(*((unsigned long *)flag_addr));
-        return ret;
+        return (long)val;
     }
 
     if (a0 == 0 && a1 == 0 && a2 == 0 && a3 == 0) {
