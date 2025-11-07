@@ -1,0 +1,43 @@
+### host runs v6.1.74 and runs on an Intel(R) Xeon(R) Gold 5222 CPU @ 3.80GHz ###
+### Guest uses a Debian 12.5 (bookworm) running a v6.1.0-21 kernel compiled with the default Debian config ###
+
+                     HOST                                   GUEST
+        | ----------- |---------------------|             |---|---|
+        |             |                     |             |   |   |
+      #virt          #id                  #phys             #phys
+ffffffff82b5ee00 D rce_flag       =>    0x695ee00    =>   0xf65ee00(possibly)
+ffffffff82b5ee10 D read_flag      =>    0x695ee10    =>   0xf65ee10(possibly)
+ffffffff826279a8 D write_flag     =>    0x64279a8    =>   0xf6279a8
+
+rce_flag address w/ KASLR: 0x02b5ee00
+read_flag address w/ KASLR: 0x02b5ee10
+write_flag address w/ KASLR: 0x026279a8
+
+
+[*] hex
+  100000000000000044434241efbeadde  
+[*] asci
+  ........DCBA....
+
+[*] RCE 250k
+  # FLAG PATH:
+    Host rce_flag: /root/rce_flag
+
+
+[*] Arbitrary read/write 50k - 100k | Hypercall #100
+  # FLAG ADDRESSES:
+    Write flag address: 0xffffffff826279a8    0x64279a8    Value: 0xdeadbeef41424344 
+    Read flag address: 0xffffffff82b5ee10     0x695ee10    Value: 0xunknown
+
+
+[*] Relative memory read/write 10k - 50k | Hypercall #102
+  # Trigger KASAN violation
+
+
+[*] DOS 50k | hypercall #103
+  # induce a null-ptr-deref KASAN violation
+
+[*] Test new gold command
+kvm_prober scanhostphys 0xf6279a8 0x777f72b5ee00 4096 --gold
+
+[*] hpa 2 gpa = 0x3B000000
