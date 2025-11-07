@@ -46,6 +46,7 @@
 #define IOCTL_TRIGGER_APIC_WRITE 0x1022
 #define IOCTL_TRIGGER_MMIO_WRITE 0x1023
 #define IOCTL_TRIGGER_IOPORT_WRITE 0x1024
+#define IOCTL_READ_FLAG_FULL     0x1025
 
 struct port_io_data {
     unsigned short port;
@@ -141,6 +142,13 @@ static void print_full_64hex_from_u64(unsigned long v)
     /* write the lower 16 hex digits (64-bit value) into the right-most part */
     snprintf(s + 48, 17, "%016llx", (unsigned long long)v);
     printf("0x%s", s);
+}
+
+/* Print 32 bytes as full 64 hex digits (no truncation) */
+static void print_full_32byte_hex(const unsigned char *buf)
+{
+    for (int i = 0; i < 32; ++i)
+        printf("%02x", buf[i]);
 }
 
 // Gold pattern constants
@@ -1012,6 +1020,18 @@ int main(int argc, char *argv[]) {
             perror("ioctl READ_FLAG_ADDR failed");
         } else {
             printf("Flag value: 0x%lx\n", value);
+        }
+
+    } else if (strcmp(cmd, "readflag_full") == 0) {
+        if (argc != 2) { print_usage(argv[0]); close(fd); return 1; }
+        unsigned char buf[32];
+        memset(buf, 0, sizeof(buf));
+        if (ioctl(fd, IOCTL_READ_FLAG_FULL, buf) < 0) {
+            perror("ioctl READ_FLAG_FULL failed");
+        } else {
+            printf("Full flag (64 hex digits): 0x");
+            print_full_32byte_hex(buf);
+            printf("\n");
         }
 
     } else if (strcmp(cmd, "writeflag") == 0) {
