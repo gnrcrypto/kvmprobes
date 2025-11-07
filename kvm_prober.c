@@ -201,7 +201,13 @@ void print_usage(char *prog_name) {
     fprintf(stderr, "  writeva <va_hex> <hex_string>\n");
     fprintf(stderr, "  patchinstr <va_hex> <hex_string>\n");
     fprintf(stderr, "  readflag\n");
+    fprintf(stderr, "  readflag_full\n");
     fprintf(stderr, "  writeflag <value_hex>\n");
+    fprintf(stderr, "  probe_flags_read\n");
+    fprintf(stderr, "  probe_flags_write <value_hex>\n");
+    fprintf(stderr, "  trigger_apic_write <offset_hex> <size_bytes> <value_hex> [apic_base_hex]\n");
+    fprintf(stderr, "  trigger_mmio_write <phys_addr_hex> <map_size> <value_size> <value_hex>\n");
+    fprintf(stderr, "  trigger_ioport_write <port_hex> <size_bytes> <value_hex>\n");
     fprintf(stderr, "  getkaslr\n");
     fprintf(stderr, "  virt2phys <virt_addr_hex>\n");
     fprintf(stderr, "  attachvq <device_id> <vq_pfn> <queue_index>\n");
