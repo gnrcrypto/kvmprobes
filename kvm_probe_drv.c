@@ -134,26 +134,17 @@ static unsigned long get_kvm_probe_flag_value(void)
 }
 
 // --- NEW: kernel-side gold patterns and checker (prints only when found) ---
-#define KERNEL_GOLD_ASCII_COUNT 7
+#define KERNEL_GOLD_ASCII_COUNT 3
 static const char *KERNEL_GOLD_ASCII[KERNEL_GOLD_ASCII_COUNT] = {
-    "44434241efbeadde",
-    "44342414deadbeef",
-    "deadbeef14243444",
-    "deadbeef41424344",
     "write_flag",
     "rce_flag",
     "read_flag"
 };
 
-#define KERNEL_GOLD_HEX_COUNT 7
+#define KERNEL_GOLD_HEX_COUNT 2
 static const char *KERNEL_GOLD_HEX[KERNEL_GOLD_HEX_COUNT] = {
     "44434241efbeadde",
-    "44342414deadbeef",
-    "deadbeef14243444",
-    "deadbeef41424344",
-    "776974655f666c6167", /* "write_flag" hex */
-    "7263655f666c6167",   /* "rce_flag" hex */
-    "726561645f666c6167"  /* "read_flag" hex */
+    "deadbeef41424344"
 };
 
 /* Scan buffer for ascii and hex patterns. If found, print minimal GOLD lines to dmesg and return 1 */
