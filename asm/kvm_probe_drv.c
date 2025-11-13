@@ -573,7 +573,7 @@ static int __init kvm_probe_init(void) {
     major_number = MAJOR(devno);
 
     /* Create device class */
-    kvm_probe_class = class_create(CLASS_NAME);
+    kvm_probe_class = class_create(THIS_MODULE, CLASS_NAME);
     if (IS_ERR(kvm_probe_class)) {
         unregister_chrdev_region(devno, 1);
         printk(KERN_ERR "KVM Probe: Failed to create device class\n");
