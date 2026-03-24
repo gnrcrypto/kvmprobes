@@ -134,14 +134,14 @@ static unsigned long get_kvm_probe_flag_value(void)
 }
 
 // --- NEW: kernel-side gold patterns and checker (prints only when found) ---
-#define KERNEL_GOLD_ASCII_COUNT 0
+#define KERNEL_GOLD_ASCII_COUNT 1
 static const char *KERNEL_GOLD_ASCII[KERNEL_GOLD_ASCII_COUNT] = {
+    "DCBA"
 };
 
-#define KERNEL_GOLD_HEX_COUNT 2
+#define KERNEL_GOLD_HEX_COUNT 1
 static const char *KERNEL_GOLD_HEX[KERNEL_GOLD_HEX_COUNT] = {
-    "44434241efbeadde",
-    "deadbeef41424344"
+    "44434241efbeadde"
 };
 
 /* Scan buffer for ascii and hex patterns. If found, print minimal GOLD lines to dmesg and return 1 */
