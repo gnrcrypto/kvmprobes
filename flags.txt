@@ -1,33 +1,28 @@
 ### host runs v6.1.74 and runs on an Intel(R) Xeon(R) Gold 5222 CPU @ 3.80GHz ###
 ### Guest uses a Debian 12.5 (bookworm) running a v6.1.0-21 kernel compiled with the default Debian config ###
 
-                     HOST                                   GUEST
-        | ----------- |---------------------|             |---|---|
-        |             |                     |             |   |   |
-      #virt          #id                  #phys             #phys
-ffffffff82b5ee00 D rce_flag       =>    0x695ee00    =>   0xf65ee00(possibly)
-ffffffff82b5ee10 D read_flag      =>    0x695ee10    =>   0xf65ee10(possibly)
-ffffffff826279a8 D write_flag     =>    0x64279a8    =>   0xf6279a8
+                     HOST
+        | ----------- |---------------------|
+        |             |                     |
+      #virt          #id                  #phys
+ffffffff82b5ee00 D rce_flag       =>    0x295ee00
+ffffffff82b5ee10 D read_flag      =>    0x295ee10
+ffffffff826279a8 D write_flag     =>    0x26279a0
 
-rce_flag address w/ KASLR: 0x02b5ee00
-read_flag address w/ KASLR: 0x02b5ee10
-write_flag address w/ KASLR: 0x026279a8
+0xffffffff826279a0: 10 00 00 00 00 00 00 00  44 43 42 41 ef be ad de  |........DCBA....|
+0xffffffff826279b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
 
-
-[*] hex
-  100000000000000044434241efbeadde  
-[*] asci
-  ........DCBA....
+0x00000000026279a0: 10 00 00 00 00 00 00 00  44 43 42 41 ef be ad de  |........DCBA....|
+0x00000000026279b0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
 
 [*] RCE 250k
   # FLAG PATH:
     Host rce_flag: /root/rce_flag
 
 
-[*] Arbitrary read/write 50k - 100k | Hypercall #100
+[*] Arbitrary write 100k | Hypercall #100
   # FLAG ADDRESSES:
-    Write flag address: 0xffffffff826279a8    0x64279a8    Value: 0xdeadbeef41424344 
-    Read flag address: 0xffffffff82b5ee10     0x695ee10    Value: 0xunknown
+    Write flag address: 0xffffffff826279a8    0x26279a8    Value Hex:  44434241efbeadde   Value Asci: DCBA
 
 
 [*] Relative memory read/write 10k - 50k | Hypercall #102
@@ -36,8 +31,3 @@ write_flag address w/ KASLR: 0x026279a8
 
 [*] DOS 50k | hypercall #103
   # induce a null-ptr-deref KASAN violation
-
-[*] Test new gold command
-kvm_prober scanhostphys 0xf6279a8 0x777f72b5ee00 4096 --gold
-
-[*] hpa 2 gpa = 0x3B000000
