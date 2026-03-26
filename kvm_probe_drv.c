@@ -22,7 +22,6 @@
 #include <linux/preempt.h>
 #include <linux/cpumask.h>
 #include <linux/smp.h>
-#include <linux/msr-index.h>
 #include <asm/msr.h>
 #include <linux/time.h>
 #include <linux/ktime.h>
