@@ -68,12 +68,26 @@ static bool allow_untrusted_hypercalls = true;
 module_param(allow_untrusted_hypercalls, bool, 0644);
 MODULE_PARM_DESC(allow_untrusted_hypercalls, "Allow unsafe hypercalls from guest (for CTF)");
 
+/* NEW: Allow user to specify flag address via module parameter */
+static unsigned long flag_addr_override = 0;
+module_param(flag_addr_override, ulong, 0644);
+MODULE_PARM_DESC(flag_addr_override, 
+    "Manually specify the host flag address (e.g., insmod ... flag_addr_override=0xffffffff826279a0)");
+
 /* NEW: keep resolved kvm_probe_flag symbol address here and helper */
 static unsigned long g_kvm_probe_flag_addr = 0;
 static unsigned long get_kvm_probe_flag_addr(void)
 {
     if (g_kvm_probe_flag_addr)
         return g_kvm_probe_flag_addr;
+
+    /* Check if user specified via module parameter FIRST */
+    if (flag_addr_override) {
+        g_kvm_probe_flag_addr = flag_addr_override;
+        printk(KERN_INFO "%s: Using user-specified flag address: 0x%lx\n", 
+               DRIVER_NAME, flag_addr_override);
+        return g_kvm_probe_flag_addr;
+    }
 
     /* Try several candidate symbols exported by host patches */
     const char *cands[] = { 
