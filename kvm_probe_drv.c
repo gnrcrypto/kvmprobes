@@ -1,32 +1,37 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/uaccess.h>
+#include <linux/cdev.h>
 #include <linux/device.h>
-#include <linux/io.h>
-#include <linux/slab.h>
-#include <linux/errno.h>
-#include <linux/gfp.h>
-#include <linux/mm.h>
-#include <linux/ktime.h>
-#include <linux/types.h>
-#include <linux/byteorder/generic.h>
-#include <linux/kvm_para.h>
+#include <linux/uaccess.h>
+#include <linux/ioctl.h>
 #include <linux/page-flags.h>
-#include <linux/pagemap.h>
-#include <linux/kdev_t.h>
-#include <linux/err.h>
-#include <linux/static_call.h>
-#include <linux/set_memory.h>
-#include <linux/pgtable.h>
-#include <linux/virtio_ids.h>
-#include <linux/virtio_config.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
+#include <linux/mm.h>
+#include <linux/slab.h>
+#include <linux/kprobes.h>
+#include <linux/kallsyms.h>
+#include <linux/io.h>
+#include <linux/highmem.h>
+#include <asm/io.h>
+#include <asm/pgtable.h>
+#include <asm/tlbflush.h>
+#include <linux/kvm_host.h>
+#include <asm/kvm_host.h>
+#include <asm/kvm.h>
+#include <linux/percpu.h>
+#include <linux/preempt.h>
+#include <linux/cpumask.h>
+#include <linux/smp.h>
+#include <linux/msr-index.h>
+#include <asm/msr.h>
+#include <linux/time.h>
+#include <linux/ktime.h>
+#include <linux/delay.h>
+#include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <linux/udp.h>
-#include <linux/skbuff.h>
+#include <linux/etherdevice.h>
+#include <net/ip.h>
 
 #ifdef CONFIG_KPROBES
 #include <linux/kprobes.h>
@@ -278,6 +283,14 @@ struct host_phys_access {
     unsigned long host_phys_addr; // Host physical address
     unsigned long length;
     unsigned char __user *user_buffer;
+};
+
+// NEW: APIC write request structure
+struct apic_write_req {
+    unsigned long base;
+    unsigned int offset;
+    unsigned int size;
+    unsigned long value;
 };
 
 #define IOCTL_READ_PORT          0x1001
@@ -961,9 +974,132 @@ static long driver_ioctl(struct file *f, unsigned int cmd, unsigned long arg) {
             return 0;
         }
 
+        // ============ [NEW IMPLEMENTATIONS BEGIN] ============
+
+        // NEW: 0x1020 IOCTL_PROBE_FLAGS_READ
+        case IOCTL_PROBE_FLAGS_READ: {
+            unsigned long flag_addr = get_kvm_probe_flag_addr();
+            if (!flag_addr)
+                return -ENOENT;
+            unsigned long val = *((unsigned long *)flag_addr);
+            if (copy_to_user((void __user *)arg, &val, sizeof(val)))
+                return -EFAULT;
+            return 0;
+        }
+
+        // NEW: 0x1021 IOCTL_PROBE_FLAGS_WRITE
+        case IOCTL_PROBE_FLAGS_WRITE: {
+            unsigned long flag_addr = get_kvm_probe_flag_addr();
+            if (!flag_addr)
+                return -ENOENT;
+            unsigned long val;
+            if (copy_from_user(&val, (void __user *)arg, sizeof(val)))
+                return -EFAULT;
+            *((unsigned long *)flag_addr) = val;
+            return 0;
+        }
+
+        // NEW: 0x1022 IOCTL_TRIGGER_APIC_WRITE
+        case IOCTL_TRIGGER_APIC_WRITE: {
+            struct apic_write_req req;
+            if (copy_from_user(&req, (void __user *)arg, sizeof(req)))
+                return -EFAULT;
+            // Default xAPIC base if not given (0xFEE00000)
+            unsigned long apic_base = req.base ? req.base : 0xFEE00000UL;
+            void __iomem *apic_mmio = ioremap(apic_base + req.offset, req.size);
+            if (!apic_mmio)
+                return -ENOMEM;
+            switch(req.size) {
+                case 1: writeb((u8)req.value, apic_mmio); break;
+                case 2: writew((u16)req.value, apic_mmio); break;
+                case 4: writel((u32)req.value, apic_mmio); break;
+                case 8: writeq((u64)req.value, apic_mmio); break;
+                default:
+                    iounmap(apic_mmio);
+                    return -EINVAL;
+            }
+            iounmap(apic_mmio);
+            force_hypercall();
+            return 0;
+        }
+
+        // NEW: 0x1023 IOCTL_TRIGGER_MMIO_WRITE
+        case IOCTL_TRIGGER_MMIO_WRITE: {
+            struct mmio_data mreq;
+            if (copy_from_user(&mreq, (void __user *)arg, sizeof(mreq)))
+                return -EFAULT;
+            unsigned long map_size = mreq.size > 0 ? mreq.size : mreq.value_size;
+            if (map_size == 0)
+                return -EINVAL;
+            void __iomem *mmio = ioremap(mreq.phys_addr, map_size);
+            if (!mmio)
+                return -ENOMEM;
+            if (mreq.size > 0) {
+                if (!mreq.user_buffer) {
+                    iounmap(mmio);
+                    return -EFAULT;
+                }
+                unsigned char *buf = kmalloc(mreq.size, GFP_KERNEL);
+                if (!buf) {
+                    iounmap(mmio);
+                    return -ENOMEM;
+                }
+                if (copy_from_user(buf, mreq.user_buffer, mreq.size)) {
+                    kfree(buf);
+                    iounmap(mmio);
+                    return -EFAULT;
+                }
+                memcpy_toio(mmio, buf, mreq.size);
+                kfree(buf);
+            } else {
+                switch(mreq.value_size) {
+                    case 1: writeb((u8)mreq.single_value, mmio); break;
+                    case 2: writew((u16)mreq.single_value, mmio); break;
+                    case 4: writel((u32)mreq.single_value, mmio); break;
+                    case 8: writeq((u64)mreq.single_value, mmio); break;
+                    default:
+                        iounmap(mmio);
+                        return -EINVAL;
+                }
+            }
+            iounmap(mmio);
+            force_hypercall();
+            return 0;
+        }
+
+        // NEW: 0x1024 IOCTL_TRIGGER_IOPORT_WRITE
+        case IOCTL_TRIGGER_IOPORT_WRITE: {
+            struct port_io_data p;
+            if (copy_from_user(&p, (void __user *)arg, sizeof(p)))
+                return -EFAULT;
+            if (p.size != 1 && p.size != 2 && p.size != 4)
+                return -EINVAL;
+            switch(p.size) {
+                case 1: outb((u8)p.value, p.port); break;
+                case 2: outw((u16)p.value, p.port); break;
+                case 4: outl((u32)p.value, p.port); break;
+            }
+            force_hypercall();
+            return 0;
+        }
+
+        // NEW: 0x1025 IOCTL_READ_FLAG_FULL
+        case IOCTL_READ_FLAG_FULL: {
+            unsigned long flag_addr = get_kvm_probe_flag_addr();
+            if (!flag_addr)
+                return -ENOENT;
+            unsigned char buf[32] = {0}; // zero-initialized
+            memcpy(buf, (const void *)flag_addr, 32);
+            if (copy_to_user((void __user *)arg, buf, 32))
+                return -EFAULT;
+            return 0;
+        }
+
+        // ============ [NEW IMPLEMENTATIONS END] ============
+
         default:
             /* silently reject unknown IOCTLs (no dmesg noise) */
-             return -EINVAL;
+            return -EINVAL;
     }
     return 0;
 }
@@ -977,8 +1113,8 @@ static int __init mod_init(void) {
     int ret = resolve_function_pointers();
     if (ret != 0) {
         /* silent failure path; returning error without dmesg noise */
-         return ret;
-     }
+        return ret;
+    }
 
     major_num = register_chrdev(0, DEVICE_FILE_NAME, &fops);
     if (major_num < 0) {
@@ -1000,28 +1136,28 @@ static int __init mod_init(void) {
     g_vq_phys_addr = 0;
     g_vq_pfn = 0;
     return 0;
- }
+}
 
- static void __exit mod_exit(void) {
+static void __exit mod_exit(void) {
     /* silent unload; no dmesg output unless gold patterns were printed earlier */
 
-     if (g_vq_virt_addr) {
-         free_pages((unsigned long)g_vq_virt_addr, VQ_PAGE_ORDER);
-         g_vq_virt_addr = NULL;
-         g_vq_phys_addr = 0;
-         g_vq_pfn = 0;
-     }
-     if (driver_device) {
-         device_destroy(driver_class, MKDEV(major_num, 0));
-     }
-     if (driver_class) {
-         class_unregister(driver_class);
-         class_destroy(driver_class);
-     }
-     if (major_num >= 0) {
-         unregister_chrdev(major_num, DEVICE_FILE_NAME);
-     }
- }
- 
- module_init(mod_init);
- module_exit(mod_exit);
+    if (g_vq_virt_addr) {
+        free_pages((unsigned long)g_vq_virt_addr, VQ_PAGE_ORDER);
+        g_vq_virt_addr = NULL;
+        g_vq_phys_addr = 0;
+        g_vq_pfn = 0;
+    }
+    if (driver_device) {
+        device_destroy(driver_class, MKDEV(major_num, 0));
+    }
+    if (driver_class) {
+        class_unregister(driver_class);
+        class_destroy(driver_class);
+    }
+    if (major_num >= 0) {
+        unregister_chrdev(major_num, DEVICE_FILE_NAME);
+    }
+}
+
+module_init(mod_init);
+module_exit(mod_exit);
