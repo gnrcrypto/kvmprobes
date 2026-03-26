@@ -129,7 +129,7 @@ struct apic_write_req {
 /* Gold pattern constants */
 #define GOLD_FLAG_STRINGS_COUNT 1
 static const char *GOLD_ASCII_STRINGS[GOLD_FLAG_STRINGS_COUNT] = {
-    "44434241efbeadde"
+    "DCBA"
 };
 
 #define GOLD_HEX_STRINGS_COUNT 1
