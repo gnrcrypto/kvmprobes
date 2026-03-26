@@ -360,7 +360,15 @@ static int resolve_function_pointers(void)
         return -ENOENT;
     }
 
-    printk(KERN_INFO "%s: Successfully resolved all function pointers\n", DRIVER_NAME);
+    /* ========== ENHANCED: Print all resolved function pointers ========== */
+    printk(KERN_INFO "%s: Successfully resolved all function pointers:", DRIVER_NAME);
+    printk(KERN_INFO "%s:   set_memory_rw    = %px", DRIVER_NAME, (void *)my_set_memory_rw);
+    printk(KERN_INFO "%s:   set_memory_ro    = %px", DRIVER_NAME, (void *)my_set_memory_ro);
+#ifdef CONFIG_KPROBES
+    printk(KERN_INFO "%s:   kallsyms_lookup_name_func = %px", DRIVER_NAME, (void *)kallsyms_lookup_name_func);
+#endif
+    /* ======================================================================= */
+
     return 0;
 }
 
