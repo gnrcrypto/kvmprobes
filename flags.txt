@@ -1,3 +1,3 @@
-Write flag address: ffffffff826279a8	26279a8
-Read flag address: ffffffff82b5ee50	2b5ee50
-Rce flag path: /root/rce_flag
+Write flag address:  0xffffffff826279a8  0x26279a8
+Read flag address:  0xffffffff82b5ee50  0x2b5ee50
+Rce flag path:  /root/rce_flag
